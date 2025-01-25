@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>CRUD with LocalStorage</title>
+    <link
+      rel="apple-touch-icon"
+      sizes="180x180"
+      href="https://siraphoprmutt.github.io/assets/favicon/apple-touch-icon.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="32x32"
+      href="https://siraphoprmutt.github.io/assets/favicon/favicon-32x32.png"
+    />
+    <link
+      rel="icon"
+      type="image/png"
+      sizes="16x16"
+      href="https://siraphoprmutt.github.io/assets/favicon/favicon-16x16.png"
+    />
+    <link
+      rel="manifest"
+      href="https://siraphoprmutt.github.io/assets/favicon/site.webmanifest"
+    />
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        background-color: #f9f9f9;
+      }
+      h1 {
+        text-align: center;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+      }
+      th,
+      td {
+        border: 1px solid #ddd;
+        padding: 12px;
+        text-align: left;
+      }
+      th {
+        background-color: #4caf50;
+        color: white;
+      }
+      .active {
+        background-color: #d4edda;
+      }
+      .inactive {
+        background-color: #f8d7da;
+      }
+      button {
+        padding: 10px 15px;
+        margin: 5px;
+        border: none;
+        cursor: pointer;
+        border-radius: 5px;
+      }
+      button:hover {
+        opacity: 0.8;
+      }
+      .btn-add {
+        background-color: #28a745;
+        color: white;
+      }
+      .btn-reset {
+        background-color: #dc3545;
+        color: white;
+      }
+      .btn-edit {
+        background-color: #ffc107;
+        color: black;
+      }
+      .btn-delete {
+        background-color: #dc3545;
+        color: white;
+      }
+      .btn-toggle {
+        background-color: #17a2b8;
+        color: white;
+      }
+      dialog {
+        width: 400px;
+        padding: 20px;
+        border: none;
+        border-radius: 10px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        font-family: Arial, sans-serif;
+        background-color: #fff;
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      dialog::backdrop {
+        background: rgba(0, 0, 0, 0.5);
+      }
+
+      dialog h2 {
+        margin-top: 0;
+        font-size: 1.5rem;
+        color: #4caf50;
+        text-align: center;
+      }
+
+      dialog form {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      dialog label {
+        font-weight: bold;
+        margin-bottom: 5px;
+      }
+
+      dialog input {
+        padding: 10px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        font-size: 1rem;
+      }
+
+      dialog button {
+        padding: 10px 15px;
+        border: none;
+        border-radius: 5px;
+        font-size: 1rem;
+        cursor: pointer;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🚀 CRUD with LocalStorage</h1>
+    <button class="btn-add" onclick="openDialog()">➕ Add Data</button>
+    <button class="btn-reset" onclick="openConfirmDialog('reset')">
+      🔄 Reset Data
+    </button>
+
+    <table id="dataTable">
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Name</th>
+          <th>Image</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <dialog id="dataDialog">
+      <form id="dataForm">
+        <input type="hidden" id="editId" />
+        <label for="name">Name:</label>
+        <input type="text" id="name" required />
+        <br />
+        <label for="image">Image:</label>
+        <input type="file" id="image" accept="image/*" />
+        <br />
+        <button type="submit" class="btn-add">💾 Save</button>
+        <button
+          type="button"
+          onclick="closeDialog('dataDialog')"
+          class="btn-reset"
+        >
+          ❌ Cancel
+        </button>
+      </form>
+    </dialog>
+
+    <dialog id="confirmDialog">
+      <p id="confirmText"></p>
+      <button id="confirmYes" class="btn-add">✔ Yes</button>
+      <button onclick="closeDialog('confirmDialog')" class="btn-reset">
+        ❌ No
+      </button>
+    </dialog>
+
+    <script>
+      const dbKey = "leetData";
+      let confirmAction;
+      const placeholderImage = "https://placehold.co/150x150";
+
+      const $ = (selector) => document.querySelector(selector);
+
+      const openDialog = (id = null) => {
+        $("#dataForm").reset();
+        if (id) {
+          const data = getAllData();
+          const { name } = data.find((item) => item.id === id);
+          $("#editId").value = id;
+          $("#name").value = name;
+        } else {
+          $("#editId").value = "";
+        }
+        $("#dataDialog").showModal();
+      };
+
+      const closeDialog = (dialogId) => {
+        $("#dataForm").reset();
+        $(`#${dialogId}`).close();
+      };
+
+      const openConfirmDialog = (action, id = null) => {
+        confirmAction = () => {
+          action === "delete" ? deleteData(id) : resetData();
+          closeDialog("confirmDialog");
+        };
+        $("#confirmText").innerText = "Are you sure?";
+        $("#confirmDialog").showModal();
+      };
+
+      $("#confirmYes").onclick = () => confirmAction();
+
+      $("#dataForm").onsubmit = (e) => {
+        e.preventDefault();
+        const id = $("#editId").value;
+        const name = $("#name").value;
+        const imageFile = $("#image").files[0];
+
+        if (id) {
+          let data = getAllData();
+          const existingItem = data.find((item) => item.id === parseInt(id));
+          if (imageFile) {
+            const reader = new FileReader();
+            reader.onload = (event) =>
+              updateData(id, name, event.target.result);
+            reader.readAsDataURL(imageFile);
+          } else {
+            updateData(id, name, existingItem.image);
+          }
+        } else {
+          if (imageFile) {
+            const reader = new FileReader();
+            reader.onload = (event) => addData(name, event.target.result);
+            reader.readAsDataURL(imageFile);
+          } else {
+            addData(name, placeholderImage);
+          }
+        }
+        closeDialog("dataDialog");
+      };
+
+      const getAllData = () => JSON.parse(localStorage.getItem(dbKey)) || [];
+
+      const addData = (name, image) => {
+        const newData = { id: Date.now(), name, image, active: true };
+        const data = [...getAllData(), newData];
+        localStorage.setItem(dbKey, JSON.stringify(data));
+        renderTable();
+      };
+
+      const updateData = (id, name, image) => {
+        let data = getAllData().map((item) =>
+          item.id === parseInt(id) ? { ...item, name, image } : item
+        );
+        localStorage.setItem(dbKey, JSON.stringify(data));
+        renderTable();
+      };
+
+      const deleteData = (id) => {
+        const data = getAllData().filter((item) => item.id !== id);
+        localStorage.setItem(dbKey, JSON.stringify(data));
+        renderTable();
+      };
+
+      const resetData = () => {
+        localStorage.removeItem(dbKey);
+        renderTable();
+      };
+
+      const toggleStatus = (id) => {
+        let data = getAllData().map((item) =>
+          item.id === id ? { ...item, active: !item.active } : item
+        );
+        localStorage.setItem(dbKey, JSON.stringify(data));
+        renderTable();
+      };
+
+      const renderTable = () => {
+        const data = getAllData();
+        const tableBody = $("#dataTable tbody");
+        tableBody.innerHTML = data.length
+          ? data
+              .map(
+                (item) => `
+            <tr class="${item.active ? "active" : "inactive"}">
+              <td>${item.id}</td>
+              <td>${item.name}</td>
+              <td><img src="${
+                item.image || placeholderImage
+              }" width="50" height="50" /></td>
+              <td>${item.active ? "✅ Active" : "❌ Inactive"}</td>
+              <td>
+                <button class="btn-toggle" onclick="toggleStatus(${
+                  item.id
+                })">🔄 Toggle</button>
+                <button class="btn-edit" onclick="openDialog(${
+                  item.id
+                })">✏ Edit</button>
+                <button class="btn-delete" onclick="openConfirmDialog('delete', ${
+                  item.id
+                })">🗑 Delete</button>
+              </td>
+            </tr>`
+              )
+              .join("")
+          : `<tr><td colspan='5'>🚫 No data available</td></tr>`;
+      };
+
+      window.onload = renderTable;
+    </script>
+  </body>
+</html>
